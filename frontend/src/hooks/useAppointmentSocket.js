@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://majorproject-3q5w.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL;
 
 /**
  * useAppointmentSocket — shared hook for real-time appointment sync.

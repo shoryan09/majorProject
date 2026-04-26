@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import api from '../services/api';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://majorproject-3q5w.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL;
 
 /* ── icons ── */
 const ChatIcon = () => (

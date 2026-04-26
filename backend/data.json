@@ -1,0 +1,339 @@
+{
+  "users": [
+    {
+      "id": "1773657419389",
+      "name": "roy",
+      "email": "roy@gmail.com",
+      "password": "$2b$10$Qi5oFF1ZdZOn8qFI60R5G.WPWclOugCtr4kwXqMNhrZiaGHJ6ndMy",
+      "role": "patient"
+    },
+    {
+      "id": "1773657847562",
+      "name": "sh",
+      "email": "sh@gmail.com",
+      "password": "$2b$10$aTGxBdewe0iTrWIlKgaTZOm0Liqv24ahdWCzQBiGdnzPfSqPi.DJ.",
+      "role": "doctor"
+    },
+    {
+      "id": "1773695361323",
+      "name": "Kai",
+      "email": "kai@gmail.com",
+      "password": "$2b$10$rxlCaxErtM0CUdQ8Ub8FguxNzf.7ftEURPnThqs8h.uMAt7ExX7nO",
+      "role": "patient"
+    },
+    {
+      "id": "1773696096525",
+      "name": "dec",
+      "email": "dec@gmail.com",
+      "password": "$2b$10$kz/LAODbQt4K0vCh6aYpneKSbnWpszK3WdS5UZwTHwK0RuffIpZhS",
+      "role": "doctor"
+    },
+    {
+      "id": "1773737382586",
+      "name": "Piyush",
+      "email": "piyush@gmail.com",
+      "password": "$2b$10$4vVWgMAfanQcXwaJ.Rie0eS1WSeu0/G7xIaplws729ExzazwF/RjK",
+      "role": "patient"
+    },
+    {
+      "id": "1773737413231",
+      "name": "Abhay",
+      "email": "abhay@gmail.com",
+      "password": "$2b$10$LeA/3xRl4sbMEXH6rWHcyOZn8J1tGz.LoKvj4F2zrj8OR9JdXElGm",
+      "role": "patient"
+    },
+    {
+      "id": "1773741009779",
+      "name": "shoryan",
+      "email": "shoryan@gmail.com",
+      "password": "$2b$10$fajx1dl5v4FBopdXVYFqLuxz/N9lBM8/dXa65LOL/s0HaJYxJKHIu",
+      "role": "patient"
+    },
+    {
+      "id": "1774044052976",
+      "name": "alice",
+      "email": "alice@gmail.com",
+      "password": "$2b$10$2sKwChkJ7BKr4z2/qeSknOExl6boxjtALsFmDq/0bG4AomDmr4ATS",
+      "role": "doctor"
+    },
+    {
+      "id": "1774044222666",
+      "name": "pek",
+      "email": "pek@gmail.com",
+      "password": "$2b$10$SdIXpcoPslUCq/XxHGRmKu/EsviTJSY.KSjHMoUoQfTqs3WspWo82",
+      "role": "admin"
+    },
+    {
+      "id": "1774291127169",
+      "name": "john",
+      "email": "john@gmail.com",
+      "password": "$2b$10$SUS/Ju66v6OofAQWwIrCl.C2fxJhTy8K1YF4Jh2gCszDitcC58pXG",
+      "role": "patient"
+    },
+    {
+      "id": "1774291468360",
+      "name": "asd",
+      "email": "asd@gmail.com",
+      "password": "$2b$10$scZUpINi3PdukfT9J5pQ.OfqYcxzQZHDSj13HuMTqxEhTaAYmuinW",
+      "role": "doctor"
+    },
+    {
+      "id": "1774291536037",
+      "name": "qwe",
+      "email": "qwe@gmail.com",
+      "password": "$2b$10$FBg9NIjc832lVImbMYiHAeG/pc4QXE//P2q/q9uEVNypzaD6JCx/u",
+      "role": "admin"
+    },
+    {
+      "id": "1774292265717",
+      "name": "as",
+      "email": "as@gmail.com",
+      "password": "$2b$10$0TzfJtM2otG9SYxoWfImmOglHOeQBa.86n35VscAER32bkape9usS",
+      "role": "patient"
+    },
+    {
+      "id": "1774294117669",
+      "name": "asdr",
+      "email": "asdr@gmail.com",
+      "password": "$2b$10$Tn.IOY/VH1ItAAgFxmMV4.HP.qHsEVkGWURi1mv1383/3s2HALXTe",
+      "role": "patient"
+    },
+    {
+      "id": "1774294234765",
+      "name": "gfx",
+      "email": "gfchgm@ail.com",
+      "password": "$2b$10$CW/psm6iZp4MVN8sIh3ZbOMwntth0zgUIfpbLGd4kAtnh12qhB4GK",
+      "role": "doctor"
+    },
+    {
+      "id": "1774294998376",
+      "name": "doc",
+      "email": "doc@gmail.com",
+      "password": "$2b$10$RRzSGRwEvC.os2Ux.Iz24eEpcEvsuYgTXFzR2z4QA2E9iJzIK0ZGO",
+      "role": "doctor"
+    },
+    {
+      "id": "1774343238881",
+      "name": "Johns",
+      "email": "johns@gmail.com",
+      "password": "$2b$10$3KWZReAAGu9llxrJRv14tu2DCiZZoBrjtvHknT4A8YNMNGVJReJLK",
+      "role": "patient"
+    },
+    {
+      "id": "1774347090439",
+      "name": "shoryanroy",
+      "email": "shoryanroy@gmail.com",
+      "password": "$2b$10$a46DCwrbGbmHcHJcuXZp1O60ozal7fjb8rhIquqvZ87yLQI3wuMDG",
+      "role": "patient"
+    },
+    {
+      "id": "1776796611817",
+      "name": "John",
+      "email": "johndoe@gmail.com",
+      "password": "$2b$10$a0yH.LgVgL/oVKWzv8fLE.oFQJGNIi/4s8BMJ.qFmdvTJdQGqbDP2",
+      "role": "patient"
+    },
+    {
+      "id": "1776998942992",
+      "name": "User One",
+      "email": "userone@gmail.com",
+      "password": "$2b$10$95Z79z9UEg8pJ8s.il1ZOeHtC6Rm6tQSZuJ.CjXLi27yu4J5bYvYa",
+      "role": "doctor"
+    },
+    {
+      "id": "1776998983008",
+      "name": "User Two",
+      "email": "usertwo@gmail.com",
+      "password": "$2b$10$dFVk4jxVijUZ3snmBFM8WexixZF75JcZitjinlVulPDAtdG89A/yK",
+      "role": "patient"
+    },
+    {
+      "id": "1776999004151",
+      "name": "User Three",
+      "email": "userthree@gmail.com",
+      "password": "$2b$10$Chdjxaj9p61Jdj6LLwdVAubpAsL71RvCwOAhWQiu1Kcy.MPoYo1zi",
+      "role": "admin"
+    },
+    {
+      "id": "1777055876630",
+      "name": "archana",
+      "email": "archana12@gmail.com",
+      "password": "$2b$10$Gg697Gfty93ronVHYjmDrOrS1dlzkM5e9H4/YXX2v1ynd2oMv1sS.",
+      "role": "patient"
+    },
+    {
+      "id": "1777060655784",
+      "name": "abhi",
+      "email": "abhi@gmail.com",
+      "password": "$2b$10$xms9DDh1jSzS4zkkxholoeaBJFtH6iJAlgwhlNlQW0nw7HUpQilNu",
+      "role": "patient",
+      "profile": {}
+    },
+    {
+      "id": "1777061540215",
+      "name": "Test User",
+      "email": "test@test.com",
+      "password": "$2b$10$zFOku5FbnfWMJPLYWPc3ceKGQcOeGgKe9O2.GhZy9dGlk1EAWaH3W",
+      "role": "patient",
+      "profile": {}
+    },
+    {
+      "id": "1777174323219",
+      "name": "random",
+      "email": "random@gmail.com",
+      "password": "$2b$10$INHnl62jKM8o8741hziP9u7bw91zam4k4WM2miET69CvjavaKPB1O",
+      "role": "patient",
+      "profile": {}
+    },
+    {
+      "id": "1777175383495",
+      "name": "Abigail",
+      "email": "abigail@gmail.com",
+      "password": "$2b$10$BNQkKqbp6Lj1Jpp5wBzrgOCRrAcAIw5VwJzYC102eEeGk.GA3mzT6",
+      "role": "doctor",
+      "profile": {
+        "phone": "123",
+        "specialization": "neurosurgeon",
+        "licenseNumber": "as",
+        "department": "as",
+        "availability": "as",
+        "bio": "as"
+      }
+    },
+    {
+      "id": "1777176717991",
+      "name": "Ella",
+      "email": "ella@gmail.com",
+      "password": "$2b$10$xppo.9t4UECwsyxqPFXnoeVS7qCf4nkpk0WH3egdfxGanVq4u9q.W",
+      "role": "patient",
+      "status": "active",
+      "profile": {
+        "age": "23",
+        "phone": "1234567890"
+      }
+    }
+  ],
+  "appointments": [
+    {
+      "id": "1774291383380",
+      "patientId": "1774291127169",
+      "doctorId": "doc1",
+      "date": "20206-04-12",
+      "time": "11:22",
+      "status": "cancelled"
+    },
+    {
+      "id": "1774292470497",
+      "patientId": "1774292265717",
+      "doctorId": "DOC-001",
+      "date": "2026-03-26",
+      "time": "12:00",
+      "status": "cancelled"
+    },
+    {
+      "id": "1774294202793",
+      "patientId": "1774294117669",
+      "doctorId": "gfsx",
+      "date": "2026-04-15",
+      "time": "12:00",
+      "status": "cancelled"
+    },
+    {
+      "id": "1777179337345",
+      "patientId": "1777178614549",
+      "doctorId": "1777175383495",
+      "date": "2026-04-27",
+      "time": "12:09",
+      "status": "confirmed",
+      "notes": "Fever",
+      "createdBy": "1777175383495",
+      "createdAt": "2026-04-26T04:55:37.345Z",
+      "updatedAt": "2026-04-26T04:56:32.067Z"
+    }
+  ],
+  "patients": [
+    {
+      "id": "1774044080753",
+      "name": "ash",
+      "age": "20",
+      "contact": "1234567890"
+    },
+    {
+      "id": "1777178614549",
+      "name": "Ella",
+      "age": "23",
+      "contact": "1234567890"
+    }
+  ],
+  "departments": [],
+  "organizations": [],
+  "auditLog": [
+    {
+      "id": "1777179392067",
+      "actorId": "1777175383495",
+      "action": "Appointment confirmed",
+      "target": {
+        "appointmentId": "1777179337345"
+      },
+      "timestamp": "2026-04-26T04:56:32.067Z"
+    },
+    {
+      "id": "1777179337345",
+      "actorId": "1777175383495",
+      "action": "Appointment created",
+      "target": {
+        "appointmentId": "1777179337345",
+        "doctorId": "1777175383495",
+        "date": "2026-04-27"
+      },
+      "timestamp": "2026-04-26T04:55:37.345Z"
+    },
+    {
+      "id": "1777178614549",
+      "actorId": "1777175383495",
+      "action": "Patient registered",
+      "target": {
+        "patientId": "1777178614549",
+        "name": "Ella"
+      },
+      "timestamp": "2026-04-26T04:43:34.549Z"
+    },
+    {
+      "id": "1777176717991",
+      "actorId": "1777176717991",
+      "action": "New patient account created",
+      "target": {
+        "userId": "1777176717991",
+        "email": "ella@gmail.com"
+      },
+      "timestamp": "2026-04-26T04:11:57.991Z"
+    },
+    {
+      "id": "1777176597953",
+      "actorId": "1777175383495",
+      "action": "Appointment cancelled",
+      "target": {
+        "appointmentId": "1774294202793"
+      },
+      "timestamp": "2026-04-26T04:09:57.953Z"
+    },
+    {
+      "id": "1777176596863",
+      "actorId": "1777175383495",
+      "action": "Appointment cancelled",
+      "target": {
+        "appointmentId": "1774292470497"
+      },
+      "timestamp": "2026-04-26T04:09:56.863Z"
+    },
+    {
+      "id": "1777176594615",
+      "actorId": "1777175383495",
+      "action": "Appointment cancelled",
+      "target": {
+        "appointmentId": "1774291383380"
+      },
+      "timestamp": "2026-04-26T04:09:54.615Z"
+    }
+  ]
+}

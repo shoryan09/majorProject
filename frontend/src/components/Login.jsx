@@ -7,7 +7,7 @@ const initialState = { email: '', password: '' };
 const getErrorMessage = (err) => {
   if (err?.response?.data?.message) return err.response.data.message;
   if (err?.code === 'ECONNABORTED') return 'The server took too long to respond. Please try again.';
-  if (err?.request) return 'Cannot reach the API server. Start the backend on port 5000 and try again.';
+  if (err?.request) return 'Cannot reach the API server. Please check your connection and try again.';
   return 'Login failed. Please check your credentials.';
 };
 

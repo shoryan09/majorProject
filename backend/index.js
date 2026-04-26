@@ -12,11 +12,25 @@ if (!process.env.GEMINI_API_KEY) {
 }
 
 const app = express();
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://major-project-zeta-two.vercel.app"
+  ],
+  credentials: true
+}));
 const server = http.createServer(app);
 
 // Socket.IO — must be created early so route handlers can emit events
 const io = new SocketServer(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "https://major-project-zeta-two.vercel.app"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
 });
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -27,7 +41,7 @@ const PROFILE_FIELDS = new Set([
   'adminTitle', 'organization', 'bio',
 ]);
 
-app.use(cors());
+// app.use(cors());
 app.use(express.json());
 
 const dataFile = process.env.DATA_FILE
@@ -472,7 +486,7 @@ app.get('/audit-log', authenticate, requireRole('admin'), (req, res) => {
 
 app.post('/api/ai-chat', authenticate, requireRole('patient'), async (req, res) => {
   const messages = req.body.messages;
-  
+
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ message: 'Please provide a valid conversation history.' });
   }

@@ -9,7 +9,7 @@ import AdminDashboard from './AdminDashboard';
 export function getStoredUser() { return JSON.parse(localStorage.getItem('hms_user') || '{}'); }
 export function getErrMsg(err, fallback) {
   if (err?.response?.data?.message) return err.response.data.message;
-  if (err?.request) return 'Cannot reach the API server. Please check your connection.';
+  if (err?.request) return 'Cannot reach the API server. Start the backend on port 5000.';
   return fallback;
 }
 

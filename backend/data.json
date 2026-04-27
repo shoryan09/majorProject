@@ -192,12 +192,12 @@
       "password": "$2b$10$BNQkKqbp6Lj1Jpp5wBzrgOCRrAcAIw5VwJzYC102eEeGk.GA3mzT6",
       "role": "doctor",
       "profile": {
-        "phone": "123",
-        "specialization": "neurosurgeon",
-        "licenseNumber": "as",
-        "department": "as",
-        "availability": "as",
-        "bio": "as"
+        "phone": "1234567890",
+        "specialization": "Neurosurgeon",
+        "licenseNumber": "MD-8743921",
+        "department": "Neurosurgery",
+        "availability": "Always",
+        "bio": "Dr. Abigail Turner is a board-certified neurosurgeon specializing in the diagnosis and surgical treatment of disorders affecting the brain, spine, and nervous system. She completed her medical education at a top-tier institution, followed by rigorous residency training in neurosurgery. With extensive experience in both elective and emergency procedures, Dr. Turner’s areas of focus include brain tumors, spinal disorders, and minimally invasive neurosurgical techniques. She is dedicated to deliver"
       }
     },
     {
@@ -211,6 +211,33 @@
         "age": "23",
         "phone": "1234567890"
       }
+    },
+    {
+      "id": "1777193562258",
+      "name": "Samsung",
+      "email": "samsung@gmail.com",
+      "password": "$2b$10$n5z63xn/5vPMKpZjFHuH.egckUjWnr4a7augM9uAsvjxGIQ.xKAFi",
+      "role": "patient",
+      "status": "active",
+      "profile": {}
+    },
+    {
+      "id": "1777214132937",
+      "name": "JohnDoee",
+      "email": "johndoee@gmail.com",
+      "password": "$2b$10$tj6qgIMxabBmX/lzX85aTO/0.to4Ew2mjEUuHMLr/YC3q8Zvy1eXm",
+      "role": "admin",
+      "status": "active",
+      "profile": {}
+    },
+    {
+      "id": "1777253268886",
+      "name": "Rupesh",
+      "email": "rupesh@gmail.com",
+      "password": "$2b$10$OHy1XBVowt.aWFVFimCcIOa/JebLMWASGHLUOn1bOKAm.Y3RceF3q",
+      "role": "admin",
+      "status": "active",
+      "profile": {}
     }
   ],
   "appointments": [
@@ -244,11 +271,23 @@
       "doctorId": "1777175383495",
       "date": "2026-04-27",
       "time": "12:09",
-      "status": "confirmed",
+      "status": "completed",
       "notes": "Fever",
       "createdBy": "1777175383495",
       "createdAt": "2026-04-26T04:55:37.345Z",
-      "updatedAt": "2026-04-26T04:56:32.067Z"
+      "updatedAt": "2026-04-26T08:56:43.320Z"
+    },
+    {
+      "id": "1777193781569",
+      "patientId": "1777193562258",
+      "doctorId": "1777175383495",
+      "date": "2026-04-28",
+      "time": "12:00",
+      "status": "completed",
+      "notes": "Not well",
+      "createdBy": "1777193562258",
+      "createdAt": "2026-04-26T08:56:21.569Z",
+      "updatedAt": "2026-04-26T08:56:52.032Z"
     }
   ],
   "patients": [
@@ -268,6 +307,74 @@
   "departments": [],
   "organizations": [],
   "auditLog": [
+    {
+      "id": "1777253268887",
+      "actorId": "1777253268886",
+      "action": "New admin account created",
+      "target": {
+        "userId": "1777253268886",
+        "email": "rupesh@gmail.com"
+      },
+      "timestamp": "2026-04-27T01:27:48.887Z"
+    },
+    {
+      "id": "1777214132937",
+      "actorId": "1777214132937",
+      "action": "New admin account created",
+      "target": {
+        "userId": "1777214132937",
+        "email": "johndoee@gmail.com"
+      },
+      "timestamp": "2026-04-26T14:35:32.937Z"
+    },
+    {
+      "id": "1777193812032",
+      "actorId": "1777175383495",
+      "action": "Appointment completed",
+      "target": {
+        "appointmentId": "1777193781569"
+      },
+      "timestamp": "2026-04-26T08:56:52.032Z"
+    },
+    {
+      "id": "1777193807937",
+      "actorId": "1777175383495",
+      "action": "Appointment confirmed",
+      "target": {
+        "appointmentId": "1777193781569"
+      },
+      "timestamp": "2026-04-26T08:56:47.937Z"
+    },
+    {
+      "id": "1777193803320",
+      "actorId": "1777175383495",
+      "action": "Appointment completed",
+      "target": {
+        "appointmentId": "1777179337345"
+      },
+      "timestamp": "2026-04-26T08:56:43.320Z"
+    },
+    {
+      "id": "1777193781569",
+      "actorId": "1777193562258",
+      "action": "Appointment created",
+      "target": {
+        "appointmentId": "1777193781569",
+        "doctorId": "1777175383495",
+        "date": "2026-04-28"
+      },
+      "timestamp": "2026-04-26T08:56:21.569Z"
+    },
+    {
+      "id": "1777193562258",
+      "actorId": "1777193562258",
+      "action": "New patient account created",
+      "target": {
+        "userId": "1777193562258",
+        "email": "samsung@gmail.com"
+      },
+      "timestamp": "2026-04-26T08:52:42.258Z"
+    },
     {
       "id": "1777179392067",
       "actorId": "1777175383495",

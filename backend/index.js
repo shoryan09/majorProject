@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const fs = require('fs');
+const mongoose = require('mongoose');
 const path = require('path');
 const http = require('http');
 const { Server: SocketServer } = require('socket.io');
@@ -10,6 +10,15 @@ require('dotenv').config();
 if (!process.env.GEMINI_API_KEY) {
   require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 }
+
+/* ── Mongoose Models ── */
+const User = require('./models/User');
+const Appointment = require('./models/Appointment');
+const Patient = require('./models/Patient');
+const Department = require('./models/Department');
+const Organization = require('./models/Organization');
+const AuditLog = require('./models/AuditLog');
+const Message = require('./models/Message');
 
 const app = express();
 app.use(cors({
@@ -21,7 +30,6 @@ app.use(cors({
 }));
 const server = http.createServer(app);
 
-// Socket.IO — must be created early so route handlers can emit events
 const io = new SocketServer(server, {
   cors: {
     origin: [
@@ -41,36 +49,19 @@ const PROFILE_FIELDS = new Set([
   'adminTitle', 'organization', 'bio',
 ]);
 
-// app.use(cors());
 app.use(express.json());
 
-const dataFile = process.env.DATA_FILE
-  ? path.resolve(process.env.DATA_FILE)
-  : path.join(__dirname, 'data.json');
+/* ── MongoDB Connection ── */
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err.message);
+    process.exit(1);
+  });
 
-/* ── data helpers ── */
-const readData = () => {
-  if (!fs.existsSync(dataFile)) {
-    return { users: [], appointments: [], patients: [], departments: [], organizations: [], auditLog: [] };
-  }
-  const raw = fs.readFileSync(dataFile, 'utf8').replace(/^\uFEFF/, '').trim();
-  const data = raw ? JSON.parse(raw) : {};
-  return {
-    users: Array.isArray(data.users) ? data.users : [],
-    appointments: Array.isArray(data.appointments) ? data.appointments : [],
-    patients: Array.isArray(data.patients) ? data.patients : [],
-    departments: Array.isArray(data.departments) ? data.departments : [],
-    organizations: Array.isArray(data.organizations) ? data.organizations : [],
-    auditLog: Array.isArray(data.auditLog) ? data.auditLog : [],
-  };
-};
-
-const writeData = (data) => {
-  fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
-};
-
+/* ── helpers ── */
 const publicUser = (user) => ({
-  id: user.id,
+  id: user._id?.toString() || user.id,
   name: user.name,
   email: user.email,
   role: user.role,
@@ -88,18 +79,19 @@ const cleanProfile = (profile = {}) => {
   }, {});
 };
 
-/* helper: add audit entry */
-const addAudit = (data, actorId, action, target = null) => {
-  if (!data.auditLog) data.auditLog = [];
-  data.auditLog.unshift({
-    id: Date.now().toString(),
-    actorId,
-    action,
-    target,
-    timestamp: new Date().toISOString(),
-  });
-  // keep max 200 entries
-  if (data.auditLog.length > 200) data.auditLog = data.auditLog.slice(0, 200);
+const addAudit = async (actorId, action, target = null) => {
+  try {
+    await AuditLog.create({ actorId, action, target });
+    // Keep max 200 entries
+    const count = await AuditLog.countDocuments();
+    if (count > 200) {
+      const oldest = await AuditLog.find().sort({ createdAt: 1 }).limit(count - 200);
+      const ids = oldest.map(e => e._id);
+      await AuditLog.deleteMany({ _id: { $in: ids } });
+    }
+  } catch (err) {
+    console.error('[AuditLog] Error:', err.message);
+  }
 };
 
 /* ── auth middleware ── */
@@ -141,24 +133,27 @@ app.post('/auth/signup', async (req, res) => {
     return res.status(400).json({ message: 'Password must be at least 6 characters' });
   }
 
-  const data = readData();
-  const existingUser = data.users.find(u => String(u.email).toLowerCase() === email);
-  if (existingUser) {
-    return res.status(409).json({ message: 'An account with this email already exists' });
-  }
+  try {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ message: 'An account with this email already exists' });
+    }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = {
-    id: Date.now().toString(), name, email, password: hashedPassword, role,
-    status: 'active',
-    credentialStatus: role === 'doctor' ? 'pending' : undefined,
-    profile: {},
-  };
-  data.users.push(user);
-  addAudit(data, user.id, `New ${role} account created`, { userId: user.id, email });
-  writeData(data);
-  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET);
-  res.json({ token, user: publicUser(user) });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name, email, password: hashedPassword, role,
+      status: 'active',
+      credentialStatus: role === 'doctor' ? 'pending' : undefined,
+      profile: {},
+    });
+
+    await addAudit(user._id.toString(), `New ${role} account created`, { userId: user._id.toString(), email });
+    const token = jwt.sign({ id: user._id.toString(), email: user.email, role: user.role }, JWT_SECRET);
+    res.json({ token, user: publicUser(user) });
+  } catch (err) {
+    console.error('[Signup] Error:', err.message);
+    res.status(500).json({ message: 'Server error during signup' });
+  }
 });
 
 app.post('/auth/login', async (req, res) => {
@@ -168,171 +163,175 @@ app.post('/auth/login', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required' });
   }
-  const data = readData();
-  const user = data.users.find(u => String(u.email).toLowerCase() === email);
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(401).json({ message: 'Invalid credentials' });
+  try {
+    const user = await User.findOne({ email });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    if (user.status === 'suspended') {
+      return res.status(403).json({ message: 'Your account has been suspended. Contact an administrator.' });
+    }
+    const token = jwt.sign({ id: user._id.toString(), email: user.email, role: user.role }, JWT_SECRET);
+    res.json({ token, user: publicUser(user) });
+  } catch (err) {
+    console.error('[Login] Error:', err.message);
+    res.status(500).json({ message: 'Server error during login' });
   }
-  if (user.status === 'suspended') {
-    return res.status(403).json({ message: 'Your account has been suspended. Contact an administrator.' });
-  }
-  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET);
-  res.json({ token, user: publicUser(user) });
 });
 
 /* ═══════════════════════════
    USER (self)
 ═══════════════════════════ */
-app.get('/me', authenticate, (req, res) => {
-  const data = readData();
-  const user = data.users.find(u => u.id === req.user.id);
-  if (!user) return res.status(404).json({ message: 'User not found' });
-  res.json({ user: publicUser(user) });
+app.get('/me', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ user: publicUser(user) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.put('/profile', authenticate, (req, res) => {
-  const data = readData();
-  const user = data.users.find(u => u.id === req.user.id);
-  if (!user) return res.status(404).json({ message: 'User not found' });
+app.put('/profile', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-  const name = String(req.body.name || '').trim();
-  if (!name) return res.status(400).json({ message: 'Name is required' });
+    const name = String(req.body.name || '').trim();
+    if (!name) return res.status(400).json({ message: 'Name is required' });
 
-  user.name = name.slice(0, 120);
-  user.profile = cleanProfile(req.body.profile);
-  writeData(data);
-  res.json({ user: publicUser(user) });
+    user.name = name.slice(0, 120);
+    user.profile = cleanProfile(req.body.profile);
+    await user.save();
+    res.json({ user: publicUser(user) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /* ═══════════════════════════
-   APPOINTMENTS — Real-time synced
-   ═══════════════════════════ */
-
-// Helper: enrich appointment with doctor/patient names for the frontend
-const enrichAppointment = (appt, data) => {
-  const doc = data.users.find(u => u.id === appt.doctorId);
-  const pat = data.users.find(u => u.id === appt.patientId);
+   APPOINTMENTS
+═══════════════════════════ */
+const enrichAppointment = async (appt) => {
+  const doc = await User.findById(appt.doctorId);
+  const pat = await User.findById(appt.patientId);
+  const obj = appt.toJSON ? appt.toJSON() : appt;
   return {
-    ...appt,
+    ...obj,
     doctorName: doc?.name || appt.doctorId,
     patientName: pat?.name || appt.patientId,
   };
 };
 
-app.get('/appointments', authenticate, (req, res) => {
-  const data = readData();
-  const raw = data.appointments.filter(
-    a => a.patientId === req.user.id || a.doctorId === req.user.id || req.user.role === 'admin'
-  );
-  res.json(raw.map(a => enrichAppointment(a, data)));
+app.get('/appointments', authenticate, async (req, res) => {
+  try {
+    const filter = req.user.role === 'admin'
+      ? {}
+      : { $or: [{ patientId: req.user.id }, { doctorId: req.user.id }] };
+    const raw = await Appointment.find(filter).sort({ date: 1, time: 1 });
+    const enriched = await Promise.all(raw.map(a => enrichAppointment(a)));
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.post('/appointments', authenticate, (req, res) => {
+app.post('/appointments', authenticate, async (req, res) => {
   const { doctorId, patientId, date, time, notes, status = 'pending' } = req.body;
   if (!doctorId || !date || !time) {
     return res.status(400).json({ message: 'Doctor ID, date, and time are required' });
   }
-  const data = readData();
+  try {
+    const conflict = await Appointment.findOne({
+      doctorId, date, time, status: { $ne: 'cancelled' }
+    });
+    if (conflict) {
+      return res.status(409).json({ message: `This time slot is already booked for ${date} at ${time}.` });
+    }
 
-  // Duplicate slot check: same doctor, same date+time, not cancelled
-  const conflict = data.appointments.find(
-    a => a.doctorId === doctorId && a.date === date && a.time === time && a.status !== 'cancelled'
-  );
-  if (conflict) {
-    return res.status(409).json({ message: `This time slot is already booked for ${date} at ${time}.` });
+    const resolvedPatientId = (req.user.role === 'doctor' || req.user.role === 'admin') && patientId
+      ? patientId : req.user.id;
+
+    const appointment = await Appointment.create({
+      patientId: resolvedPatientId, doctorId, date, time, status,
+      notes: (notes || '').trim().slice(0, 1000),
+      createdBy: req.user.id,
+    });
+
+    await addAudit(req.user.id, 'Appointment created', { appointmentId: appointment._id.toString(), doctorId, date });
+    const enriched = await enrichAppointment(appointment);
+
+    io.to(`user_${appointment.patientId}`).emit('appointmentCreated', enriched);
+    io.to(`user_${appointment.doctorId}`).emit('appointmentCreated', enriched);
+    const admins = await User.find({ role: 'admin' });
+    admins.forEach(a => io.to(`user_${a._id.toString()}`).emit('appointmentCreated', enriched));
+
+    res.json(enriched);
+  } catch (err) {
+    console.error('[Appointment] Error:', err.message);
+    res.status(500).json({ message: 'Server error' });
   }
-
-  // If a doctor creates the appointment, patientId comes from body; otherwise it's the logged-in user
-  const resolvedPatientId = (req.user.role === 'doctor' || req.user.role === 'admin') && patientId
-    ? patientId
-    : req.user.id;
-
-  const appointment = {
-    id: Date.now().toString(),
-    patientId: resolvedPatientId,
-    doctorId,
-    date,
-    time,
-    status,
-    notes: (notes || '').trim().slice(0, 1000),
-    createdBy: req.user.id,
-    createdAt: new Date().toISOString(),
-  };
-  data.appointments.push(appointment);
-  addAudit(data, req.user.id, 'Appointment created', { appointmentId: appointment.id, doctorId, date });
-  writeData(data);
-
-  const enriched = enrichAppointment(appointment, data);
-
-  // Real-time: emit to both patient and doctor userId rooms
-  io.to(`user_${appointment.patientId}`).emit('appointmentCreated', enriched);
-  io.to(`user_${appointment.doctorId}`).emit('appointmentCreated', enriched);
-  // Also notify admins
-  data.users.filter(u => u.role === 'admin').forEach(a => {
-    io.to(`user_${a.id}`).emit('appointmentCreated', enriched);
-  });
-  console.log(`[Appt] Created #${appointment.id} → emitted to user_${appointment.patientId} & user_${appointment.doctorId}`);
-
-  res.json(enriched);
 });
 
-app.put('/appointments/:id/status', authenticate, requireRole('doctor', 'admin'), (req, res) => {
+app.put('/appointments/:id/status', authenticate, requireRole('doctor', 'admin'), async (req, res) => {
   const { status } = req.body;
   const allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
   if (!allowed.includes(status)) {
     return res.status(400).json({ message: `Status must be one of: ${allowed.join(', ')}` });
   }
-  const data = readData();
-  const appt = data.appointments.find(a => a.id === req.params.id);
-  if (!appt) return res.status(404).json({ message: 'Appointment not found' });
-  const prevStatus = appt.status;
-  appt.status = status;
-  appt.updatedAt = new Date().toISOString();
-  addAudit(data, req.user.id, `Appointment ${status}`, { appointmentId: appt.id });
-  writeData(data);
+  try {
+    const appt = await Appointment.findById(req.params.id);
+    if (!appt) return res.status(404).json({ message: 'Appointment not found' });
+    appt.status = status;
+    await appt.save();
+    await addAudit(req.user.id, `Appointment ${status}`, { appointmentId: appt._id.toString() });
+    const enriched = await enrichAppointment(appt);
 
-  const enriched = enrichAppointment(appt, data);
+    io.to(`user_${appt.patientId}`).emit('appointmentUpdated', enriched);
+    io.to(`user_${appt.doctorId}`).emit('appointmentUpdated', enriched);
+    const admins = await User.find({ role: 'admin' });
+    admins.forEach(a => io.to(`user_${a._id.toString()}`).emit('appointmentUpdated', enriched));
 
-  // Real-time: emit update to all involved parties
-  io.to(`user_${appt.patientId}`).emit('appointmentUpdated', enriched);
-  io.to(`user_${appt.doctorId}`).emit('appointmentUpdated', enriched);
-  data.users.filter(u => u.role === 'admin').forEach(a => {
-    io.to(`user_${a.id}`).emit('appointmentUpdated', enriched);
-  });
-  console.log(`[Appt] Updated #${appt.id} → ${status} — emitted to user_${appt.patientId} & user_${appt.doctorId}`);
-
-  res.json(enriched);
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /* ═══════════════════════════
-   DOCTORS LIST (for patient booking)
-   ═══════════════════════════ */
-app.get('/doctors', authenticate, (req, res) => {
-  const data = readData();
-  const doctors = data.users
-    .filter(u => u.role === 'doctor' && u.status !== 'suspended')
-    .map(u => ({
-      id: u.id,
+   DOCTORS LIST
+═══════════════════════════ */
+app.get('/doctors', authenticate, async (req, res) => {
+  try {
+    const doctors = await User.find({ role: 'doctor', status: { $ne: 'suspended' } });
+    res.json(doctors.map(u => ({
+      id: u._id.toString(),
       name: u.name,
       email: u.email,
       specialization: u.profile?.specialization || '',
       department: u.profile?.department || '',
-    }));
-  res.json(doctors);
+    })));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /* ═══════════════════════════
    PATIENTS
 ═══════════════════════════ */
-app.get('/patients', authenticate, (req, res) => {
+app.get('/patients', authenticate, async (req, res) => {
   if (req.user.role !== 'doctor' && req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Access denied' });
   }
-  const data = readData();
-  res.json(data.patients);
+  try {
+    const patients = await Patient.find();
+    res.json(patients);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.post('/patients', authenticate, (req, res) => {
+app.post('/patients', authenticate, async (req, res) => {
   if (req.user.role !== 'doctor' && req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Access denied' });
   }
@@ -340,157 +339,184 @@ app.post('/patients', authenticate, (req, res) => {
   if (!name || !age || !contact) {
     return res.status(400).json({ message: 'Name, age, and contact are required' });
   }
-  const data = readData();
-  const patient = { id: Date.now().toString(), name, age, contact };
-  data.patients.push(patient);
-  addAudit(data, req.user.id, 'Patient registered', { patientId: patient.id, name });
-  writeData(data);
-  res.json(patient);
+  try {
+    const patient = await Patient.create({ name, age, contact });
+    await addAudit(req.user.id, 'Patient registered', { patientId: patient._id.toString(), name });
+    res.json(patient);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /* ═══════════════════════════
    ADMIN: USER MANAGEMENT
 ═══════════════════════════ */
-app.get('/users', authenticate, requireRole('admin'), (req, res) => {
-  const data = readData();
-  res.json(data.users.map(publicUser));
+app.get('/users', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const users = await User.find();
+    res.json(users.map(publicUser));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.put('/users/:id/role', authenticate, requireRole('admin'), (req, res) => {
+app.put('/users/:id/role', authenticate, requireRole('admin'), async (req, res) => {
   const { role } = req.body;
   if (!ALLOWED_ROLES.has(role)) {
     return res.status(400).json({ message: 'Invalid role' });
   }
-  const data = readData();
-  const user = data.users.find(u => u.id === req.params.id);
-  if (!user) return res.status(404).json({ message: 'User not found' });
-  if (user.id === req.user.id) return res.status(400).json({ message: 'Cannot change your own role' });
-  const old = user.role;
-  user.role = role;
-  if (role === 'doctor' && !user.credentialStatus) user.credentialStatus = 'pending';
-  addAudit(data, req.user.id, `Changed role ${old} → ${role}`, { userId: user.id, email: user.email });
-  writeData(data);
-  res.json(publicUser(user));
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user._id.toString() === req.user.id) return res.status(400).json({ message: 'Cannot change your own role' });
+    const old = user.role;
+    user.role = role;
+    if (role === 'doctor' && !user.credentialStatus) user.credentialStatus = 'pending';
+    await user.save();
+    await addAudit(req.user.id, `Changed role ${old} → ${role}`, { userId: user._id.toString(), email: user.email });
+    res.json(publicUser(user));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.put('/users/:id/status', authenticate, requireRole('admin'), (req, res) => {
+app.put('/users/:id/status', authenticate, requireRole('admin'), async (req, res) => {
   const { status } = req.body;
   if (!['active', 'suspended'].includes(status)) {
     return res.status(400).json({ message: 'Status must be active or suspended' });
   }
-  const data = readData();
-  const user = data.users.find(u => u.id === req.params.id);
-  if (!user) return res.status(404).json({ message: 'User not found' });
-  if (user.id === req.user.id) return res.status(400).json({ message: 'Cannot change your own status' });
-  user.status = status;
-  addAudit(data, req.user.id, `User ${status}`, { userId: user.id, email: user.email });
-  writeData(data);
-  res.json(publicUser(user));
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user._id.toString() === req.user.id) return res.status(400).json({ message: 'Cannot change your own status' });
+    user.status = status;
+    await user.save();
+    await addAudit(req.user.id, `User ${status}`, { userId: user._id.toString(), email: user.email });
+    res.json(publicUser(user));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.put('/users/:id/verify', authenticate, requireRole('admin'), (req, res) => {
+app.put('/users/:id/verify', authenticate, requireRole('admin'), async (req, res) => {
   const { credentialStatus } = req.body;
   if (!['pending', 'verified', 'rejected'].includes(credentialStatus)) {
     return res.status(400).json({ message: 'credentialStatus must be pending, verified, or rejected' });
   }
-  const data = readData();
-  const user = data.users.find(u => u.id === req.params.id);
-  if (!user) return res.status(404).json({ message: 'User not found' });
-  if (user.role !== 'doctor') return res.status(400).json({ message: 'Only doctors have credentials to verify' });
-  user.credentialStatus = credentialStatus;
-  addAudit(data, req.user.id, `Doctor credentials ${credentialStatus}`, { userId: user.id, email: user.email });
-  writeData(data);
-  res.json(publicUser(user));
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.role !== 'doctor') return res.status(400).json({ message: 'Only doctors have credentials to verify' });
+    user.credentialStatus = credentialStatus;
+    await user.save();
+    await addAudit(req.user.id, `Doctor credentials ${credentialStatus}`, { userId: user._id.toString(), email: user.email });
+    res.json(publicUser(user));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /* ═══════════════════════════
    ADMIN: DEPARTMENTS
 ═══════════════════════════ */
-app.get('/departments', authenticate, (req, res) => {
-  const data = readData();
-  res.json(data.departments || []);
+app.get('/departments', authenticate, async (req, res) => {
+  try {
+    const departments = await Department.find();
+    res.json(departments);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.post('/departments', authenticate, requireRole('admin'), (req, res) => {
+app.post('/departments', authenticate, requireRole('admin'), async (req, res) => {
   const name = String(req.body.name || '').trim();
   const head = String(req.body.head || '').trim();
   if (!name) return res.status(400).json({ message: 'Department name is required' });
-  const data = readData();
-  if (!data.departments) data.departments = [];
-  const dept = { id: Date.now().toString(), name, head, createdAt: new Date().toISOString() };
-  data.departments.push(dept);
-  addAudit(data, req.user.id, 'Department created', { deptId: dept.id, name });
-  writeData(data);
-  res.json(dept);
+  try {
+    const dept = await Department.create({ name, head });
+    await addAudit(req.user.id, 'Department created', { deptId: dept._id.toString(), name });
+    res.json(dept);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.delete('/departments/:id', authenticate, requireRole('admin'), (req, res) => {
-  const data = readData();
-  const idx = (data.departments || []).findIndex(d => d.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ message: 'Department not found' });
-  const removed = data.departments.splice(idx, 1)[0];
-  addAudit(data, req.user.id, 'Department deleted', { deptId: removed.id, name: removed.name });
-  writeData(data);
-  res.json({ message: 'Deleted' });
+app.delete('/departments/:id', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const removed = await Department.findByIdAndDelete(req.params.id);
+    if (!removed) return res.status(404).json({ message: 'Department not found' });
+    await addAudit(req.user.id, 'Department deleted', { deptId: removed._id.toString(), name: removed.name });
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /* ═══════════════════════════
    ADMIN: ORGANIZATIONS
 ═══════════════════════════ */
-app.get('/organizations', authenticate, (req, res) => {
-  const data = readData();
-  res.json(data.organizations || []);
+app.get('/organizations', authenticate, async (req, res) => {
+  try {
+    const organizations = await Organization.find();
+    res.json(organizations);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.post('/organizations', authenticate, requireRole('admin'), (req, res) => {
+app.post('/organizations', authenticate, requireRole('admin'), async (req, res) => {
   const name = String(req.body.name || '').trim();
   const type = String(req.body.type || 'clinic').trim();
   const city = String(req.body.city || '').trim();
   if (!name) return res.status(400).json({ message: 'Organization name is required' });
-  const data = readData();
-  if (!data.organizations) data.organizations = [];
-  const org = { id: Date.now().toString(), name, type, city, createdAt: new Date().toISOString() };
-  data.organizations.push(org);
-  addAudit(data, req.user.id, 'Organization created', { orgId: org.id, name });
-  writeData(data);
-  res.json(org);
+  try {
+    const org = await Organization.create({ name, type, city });
+    await addAudit(req.user.id, 'Organization created', { orgId: org._id.toString(), name });
+    res.json(org);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-app.delete('/organizations/:id', authenticate, requireRole('admin'), (req, res) => {
-  const data = readData();
-  const idx = (data.organizations || []).findIndex(o => o.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ message: 'Organization not found' });
-  const removed = data.organizations.splice(idx, 1)[0];
-  addAudit(data, req.user.id, 'Organization deleted', { orgId: removed.id, name: removed.name });
-  writeData(data);
-  res.json({ message: 'Deleted' });
+app.delete('/organizations/:id', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const removed = await Organization.findByIdAndDelete(req.params.id);
+    if (!removed) return res.status(404).json({ message: 'Organization not found' });
+    await addAudit(req.user.id, 'Organization deleted', { orgId: removed._id.toString(), name: removed.name });
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /* ═══════════════════════════
    ADMIN: AUDIT LOG
 ═══════════════════════════ */
-app.get('/audit-log', authenticate, requireRole('admin'), (req, res) => {
-  const data = readData();
-  // enrich with actor names
-  const log = (data.auditLog || []).map(entry => {
-    const actor = data.users.find(u => u.id === entry.actorId);
-    return { ...entry, actorName: actor?.name || 'System', actorRole: actor?.role || 'unknown' };
-  });
-  res.json(log.slice(0, 100));
+app.get('/audit-log', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(100);
+    const enriched = await Promise.all(logs.map(async (entry) => {
+      const actor = await User.findById(entry.actorId);
+      return {
+        ...entry.toJSON(),
+        actorName: actor?.name || 'System',
+        actorRole: actor?.role || 'unknown',
+      };
+    }));
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /* ═══════════════════════════
-   CHAT — In-memory message store
-   TODO: Replace with database persistence (MongoDB, Postgres, etc.)
-   ═══════════════════════════ */
-
+   AI CHAT
+═══════════════════════════ */
 app.post('/api/ai-chat', authenticate, requireRole('patient'), async (req, res) => {
   const messages = req.body.messages;
-
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ message: 'Please provide a valid conversation history.' });
   }
-
   if (!process.env.GEMINI_API_KEY) {
     return res.status(500).json({ message: 'AI assistant is not configured on the server.' });
   }
@@ -510,8 +536,6 @@ Rules:
 - For emergencies (chest pain, breathing difficulty, fainting, seizures, stroke-like symptoms, severe bleeding, unconsciousness), tell the user to seek immediate medical care.
 - Use disclaimers sparingly, not in every message.`;
 
-  // Build the message payload for Gemini
-  // Gemini expects: { role: 'user' | 'model', parts: [{ text: '...' }] }
   const geminiMessages = messages.map(msg => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: String(msg.content || '').trim().slice(0, 3000) }]
@@ -520,16 +544,11 @@ Rules:
   try {
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: geminiMessages,
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 500,
-        }
+        generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
       }),
     });
 
@@ -541,8 +560,6 @@ Rules:
 
     const data = await geminiRes.json();
     const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'I could not process your message.';
-
-    // TODO: Add MongoDB persistence here later for the conversational reply.
     res.json({ reply });
   } catch (err) {
     console.error('[AI Chat] Request failed:', err.message);
@@ -550,61 +567,54 @@ Rules:
   }
 });
 
-// In-memory store: { [conversationId]: [ { id, conversationId, senderId, senderName, senderRole, text, timestamp } ] }
-// TODO: When adding a database, replace this Map with DB queries.
-const chatStore = new Map();
-
-function getChatMessages(conversationId) {
-  // TODO: Replace with DB query — e.g. Message.find({ conversationId }).sort({ timestamp: 1 })
-  return chatStore.get(conversationId) || [];
-}
-
-function saveChatMessage(msg) {
-  // TODO: Replace with DB insert — e.g. await Message.create(msg)
-  if (!chatStore.has(msg.conversationId)) chatStore.set(msg.conversationId, []);
-  chatStore.get(msg.conversationId).push(msg);
-  // Cap at 500 messages per conversation in memory
-  const arr = chatStore.get(msg.conversationId);
-  if (arr.length > 500) chatStore.set(msg.conversationId, arr.slice(-500));
-}
-
-// REST endpoint: fetch chat history for a conversation
-app.get('/chat/:conversationId', authenticate, (req, res) => {
-  // TODO: Add authorization check — ensure user is a participant of this conversation
-  const messages = getChatMessages(req.params.conversationId);
-  res.json(messages);
+/* ═══════════════════════════
+   CHAT — MongoDB persistent store
+═══════════════════════════ */
+app.get('/chat/:conversationId', authenticate, async (req, res) => {
+  try {
+    const messages = await Message.find({ conversationId: req.params.conversationId }).sort({ createdAt: 1 });
+    res.json(messages);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-// REST endpoint: list conversations for current user
-app.get('/conversations', authenticate, (req, res) => {
-  // TODO: Replace with DB query when persistence is added
-  const userId = req.user.id;
-  const convos = [];
-  for (const [convId, msgs] of chatStore.entries()) {
-    const userMsgs = msgs.filter(m => m.senderId === userId || m.recipientId === userId);
-    if (userMsgs.length > 0) {
-      const last = msgs[msgs.length - 1];
-      convos.push({ conversationId: convId, lastMessage: last, messageCount: msgs.length });
-    }
+app.get('/conversations', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userMessages = await Message.find({
+      $or: [{ senderId: userId }, { recipientId: userId }]
+    });
+
+    const convMap = new Map();
+    userMessages.forEach(msg => {
+      const cid = msg.conversationId;
+      if (!convMap.has(cid)) {
+        convMap.set(cid, { conversationId: cid, lastMessage: msg, messageCount: 0 });
+      }
+      const entry = convMap.get(cid);
+      entry.messageCount++;
+      if (new Date(msg.createdAt) > new Date(entry.lastMessage.createdAt)) {
+        entry.lastMessage = msg;
+      }
+    });
+
+    res.json(Array.from(convMap.values()));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
-  res.json(convos);
 });
 
 /* ═══════════════════════════
-   SOCKET.IO CONNECTION HANDLERS
-   (io is created at top of file)
-   ═══════════════════════════ */
-
-// Authenticate socket connections via JWT
-io.use((socket, next) => {
+   SOCKET.IO
+═══════════════════════════ */
+io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error('Authentication required'));
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     socket.user = decoded;
-    // Enrich with full user data
-    const data = readData();
-    const fullUser = data.users.find(u => u.id === decoded.id);
+    const fullUser = await User.findById(decoded.id);
     if (fullUser) {
       socket.user.name = fullUser.name;
       socket.user.role = fullUser.role;
@@ -617,46 +627,38 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   console.log(`[Socket] ${socket.user.name} (${socket.user.role}) connected`);
-
-  // Auto-join user's personal room for appointment events
   const userRoom = `user_${socket.user.id}`;
   socket.join(userRoom);
   console.log(`[Socket] ${socket.user.name} auto-joined room: ${userRoom}`);
 
-  // Join a conversation room (chat)
   socket.on('join_conversation', (conversationId) => {
     socket.join(conversationId);
     console.log(`[Socket] ${socket.user.name} joined room: ${conversationId}`);
   });
 
-  // Leave a conversation room
   socket.on('leave_conversation', (conversationId) => {
     socket.leave(conversationId);
   });
 
-  // Send a message
-  socket.on('send_message', ({ conversationId, text, recipientId }) => {
+  socket.on('send_message', async ({ conversationId, text, recipientId }) => {
     if (!conversationId || !text?.trim()) return;
 
-    const message = {
-      id: Date.now().toString() + '_' + Math.random().toString(36).slice(2, 8),
-      conversationId,
-      senderId: socket.user.id,
-      senderName: socket.user.name || 'User',
-      senderRole: socket.user.role || 'patient',
-      recipientId: recipientId || null,
-      text: text.trim().slice(0, 2000),
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const message = await Message.create({
+        conversationId,
+        senderId: socket.user.id,
+        senderName: socket.user.name || 'User',
+        senderRole: socket.user.role || 'patient',
+        recipientId: recipientId || null,
+        text: text.trim().slice(0, 2000),
+      });
 
-    // TODO: Replace saveChatMessage with a database write
-    saveChatMessage(message);
-
-    // Broadcast to everyone in the room (including sender)
-    io.to(conversationId).emit('new_message', message);
+      io.to(conversationId).emit('new_message', message.toJSON());
+    } catch (err) {
+      console.error('[Socket] Error saving message:', err.message);
+    }
   });
 
-  // Typing indicator
   socket.on('typing', ({ conversationId }) => {
     socket.to(conversationId).emit('user_typing', {
       userId: socket.user.id,

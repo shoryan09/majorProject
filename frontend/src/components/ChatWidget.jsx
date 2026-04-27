@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import api from '../services/api';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
 
 /* ── icons ── */
 const ChatIcon = () => (
@@ -265,7 +265,7 @@ export default function ChatWidget({ user }) {
                     <div style={{fontSize:28,marginBottom:8,opacity:0.4}}>👋</div>
                     <div>Start the conversation!</div>
                     <div style={{fontSize:11,marginTop:4,color:'var(--text-subtle)'}}>
-                      Messages are stored in server memory for this session.
+                      Messages are saved to the database and will persist across sessions.
                     </div>
                   </div>
                 )}
